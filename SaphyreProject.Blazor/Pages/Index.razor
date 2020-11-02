@@ -1,0 +1,131 @@
+﻿@page "/"
+@implements IDisposable
+@using SaphyreProject.Shared;
+@using SaphyreProject.Shared.ViewModels
+@using SaphyreProject.Shared.Services;
+@using Microsoft.AspNetCore.SignalR.Client
+@inject IJSRuntime jsRuntime
+@inject HttpClient Http
+@inject IHubClientFactory hubClientFactory
+
+<h1>Profile</h1>
+
+@if (notificationVisible)
+{
+  <div class="alert alert-warning alert-dismissible fade show" role="alert">
+    @notificationMessage
+    <button type="button" class="close" data-dismiss="alert" aria-label="Close" @onclick="_ => notificationVisible = false">
+      <span aria-hidden="true">&times;</span>
+    </button>
+  </div>
+}
+
+@if (editing)
+{
+  <div>
+    <div class="form-group">
+      <label>First Name: </label>
+      <input type="text" class="form-control" @bind="editFirstName" style="max-width: 300px" />
+    </div>
+    <div class="form-group">
+      <label>Last Name: </label>
+      <input type="text" class="form-control" @bind="editLastName" style="max-width: 300px" />
+    </div>
+    <div class="form-group">
+      <label>Phone Number: </label>
+      <input type="text" class="form-control" @bind="editPhoneNumber" style="max-width: 300px" />
+    </div>
+  </div>
+  <div>
+    <button class="btn btn-light" type="button" @onclick="OnClickCancel" style="margin-right: 1rem;">Cancel</button>
+    <button class="btn btn-success" type="button" @onclick="OnClickSave">Save</button>
+  </div> }
+else if (viewModel != null)
+{
+  <div>
+    <div class="form-group">
+      <h5>First Name:</h5>
+      <div>@viewModel.FirstName</div>
+    </div>
+    <div class="form-group">
+      <h5>Last Name:</h5>
+      <div>@viewModel.LastName</div>
+    </div>
+    <div class="form-group">
+      <h5>Phone Number:</h5>
+      <div>@viewModel.PhoneNumber</div>
+    </div>
+  </div>
+  <button class="btn btn-primary" type="button" @onclick="OnClickEdit">Edit</button>
+}
+
+@code { 
+  [CascadingParameter(Name = "BaseApiUrl")]
+  private string BaseApiUrl { get; set; }
+  [CascadingParameter(Name = "HubUrl")]
+  private string HubUrl { get; set; }
+
+  private bool editing;
+  private ProfileVM viewModel;
+  private string editFirstName;
+  private string editLastName;
+  private string editPhoneNumber;
+
+  private bool notificationVisible;
+  private string notificationMessage;
+
+  private HubConnection hubConnection;
+
+
+  // -- Event Handlers --
+  private void OnClickCancel()
+  {
+    editFirstName = "";
+    editLastName = "";
+    editPhoneNumber = "";
+    editing = false;
+    StateHasChanged();
+  }
+  private async Task OnClickSave()
+  {
+    await Http.PostAsJsonAsync<ProfileVM>(BaseApiUrl + "profile", new ProfileVM
+    {
+      FirstName = editFirstName,
+      LastName = editLastName,
+      PhoneNumber = editPhoneNumber,
+    });
+    OnClickCancel();
+  }
+  private void OnClickEdit()
+  {
+    editFirstName = viewModel.FirstName;
+    editLastName = viewModel.LastName;
+    editPhoneNumber = viewModel.PhoneNumber;
+    editing = true;
+    StateHasChanged();
+  }
+
+  // -- Life Cycle --
+  protected override async Task OnInitializedAsync()
+  {
+    hubConnection = hubClientFactory.Create(HubUrl);
+    hubConnection.On<ProfileVM, DispatchInfo>("DispatchedProfile", (vm, dispatchInfo) =>
+    {
+      viewModel = vm;
+      notificationVisible = true;
+      notificationMessage = dispatchInfo.Message;
+      StateHasChanged();
+    });
+    hubConnection.On<ProfileVM>("FetchedProfile", (vm) =>
+    {
+      viewModel = vm;
+      StateHasChanged();
+    });
+    await hubConnection.StartAsync();
+    await hubConnection.SendAsync("FetchProfile");
+  }
+  public void Dispose()
+  {
+    _ = hubConnection.DisposeAsync();
+  }
+}

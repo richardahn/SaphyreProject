@@ -1,0 +1,14 @@
+<Router AppAssembly="@typeof(Program).Assembly">
+    <Found Context="routeData">
+      <CascadingValue Value="@("https://localhost:5002/api/")" Name="BaseApiUrl">
+        <CascadingValue Value="@("https://localhost:5002/profilehub")" Name="HubUrl">
+          <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        </CascadingValue>
+      </CascadingValue>
+    </Found>
+    <NotFound>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <p>Sorry, there's nothing at this address.</p>
+        </LayoutView>
+    </NotFound>
+</Router>
